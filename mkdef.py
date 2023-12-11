@@ -1,13 +1,36 @@
 import re
 
+###############################################################
+# Exemple of table defined in C:
+#
+#   const T_IO mapping[]=
+#   {
+#	{PIOA,PIO_PA0},			///< OUT_DBG1
+#	{PIOA,PIO_PA1},			///< OUT_DBG2
+#   }
+#
+# or
+#
+#   const int mapping[]=
+#   {
+#       1, ///< OUT1
+#       2, ///< OUT2
+#   }
+#
+# Then call the function:
+#
+# make_defines_from_ctab('myfile.c','mapping')
+#
+###############################################################
+
 def make_defines_from_ctab(filename,tabName):
     IDLE=0
     SCANNING=1
 
-    pTable=re.compile(r'([0-9a-zA-Z_]+) (.+)\[.*\].*=.*{')
-    pElm=re.compile(r'.+,*.*///< (.+)')    
+    pTable=re.compile(r'([0-9a-zA-Z_]+) (.+)\[.*\].*=.*')
+    pElm=re.compile(r'(.+),*.*\/\/\/< (.+) *[0-9]*')    
 
-    lstDefines=[]
+    dicDefines={}
     with open(filename) as fp:
         state=IDLE
         for ln in fp.readlines():
@@ -19,15 +42,16 @@ def make_defines_from_ctab(filename,tabName):
             elif state==SCANNING:
                 m=pElm.match(ln)
                 if m!=None:
-                    nme=m.group(1).strip()
-                    if nme in lstDefines:
+                    hard=m.group(1).strip()
+                    nme=m.group(2).strip()
+                    if nme in dicDefines.keys():
                         raise Exception('ERREUR: %s est en double' % nme)
                     else:
-                        lstDefines.append(nme)
+                        dicDefines[nme]=hard
                 elif '};' in ln:
                     break;
 
-    if len(lstDefines)==0:
+    if len(dicDefines.keys())==0:
         print('ERREUR: Aucun élément détecté')
         return
 
@@ -37,8 +61,8 @@ def make_defines_from_ctab(filename,tabName):
     print('* DEBUT CODE AUTOGENERE: NE PAS MODIFIER (Utiliser mkdef.py)')
     print('* @{')
     print('%s*/' % ('*'*60))
-    for i,nme in enumerate(lstDefines):
-        print('#define %-30s %d' % (nme,i))
+    for i,nme in enumerate(dicDefines.keys()):
+        print('#define %-30s %-4d    ///< %s' % (nme,i,dicDefines[nme]))
         
     print('/**%s' % ('*'*59))
     print('* @}')
